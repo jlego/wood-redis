@@ -1,6 +1,6 @@
 {
   "name": "wood-redis",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -22,6 +22,6 @@
   "dependencies": {
     "redis": "^2.8.0",
     "redlock-node": "^2.1.4",
-    "wood-util": "^1.0.3"
+    "wood-util": "^1.0.5"
   }
 }
