@@ -5,12 +5,11 @@
  */
 const Redis = require('./src/redis');
 
-module.exports = (app, config = {}) => {
-  if(app){
-    app.Redis = Redis;
-    for (let key in config) {
-      Redis.connect(config[key]);
-    }
+module.exports = (app = {}, config = {}) => {
+  app.Redis = Redis;
+  for (let key in config) {
+    Redis.connect(config[key]);
   }
-  return Redis;
+  if(app.addAppProp) app.addAppProp('Redis', app.Redis);
+  return app;
 }
