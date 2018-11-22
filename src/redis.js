@@ -1,14 +1,15 @@
 // redis操作方法类
-// by YuRonghui 2018-2-1
+// by YuRonghui 2018-11-22
 const redis = require("redis");
 const RedLock = require('redlock-node');
 const { Util } = require('wood-util')();
-let db = null, redlock = null;
+let dbs = {}, redlock = null;
 
 class Redis {
-  constructor(tbname) {
+  constructor(tbname, db = 'master') {
     this.tbname = tbname;
-    if(!db) throw Util.error('redis failed: db=null');
+    this.db = dbs[db];
+    if(!this.db) throw Util.error('redis failed: db=null');
   }
   getKey(key){
     let str = `${WOOD.config.projectName}:${this.tbname}`;
@@ -17,7 +18,7 @@ class Redis {
   // 新行id
   rowid() {
     return new Promise((resolve, reject) => {
-      db.incr(this.getKey('rowid'), (err, res) => {
+      this.db.incr(this.getKey('rowid'), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -26,7 +27,7 @@ class Redis {
   // 设单值
   setValue(key, value) {
     return new Promise((resolve, reject) => {
-      db.set(this.getKey(key), value, (err, res) => {
+      this.db.set(this.getKey(key), value, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -35,17 +36,37 @@ class Redis {
   // 取单值
   getValue(key) {
     return new Promise((resolve, reject) => {
-      db.get(this.getKey(key), (err, res) => {
+      this.db.Hget(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
     });
   }
-  GetValue(key, callback) {
-    db.get(key, function (err, res) {
-      if (callback) {
-        callback(err, key, res);
-      }
+  // 设值
+  setHaseValue(key, value) {
+    return new Promise((resolve, reject) => {
+      this.db.Hset(this.getKey(key), value, (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
+    });
+  }
+  // 取值
+  getHaseValue(key) {
+    return new Promise((resolve, reject) => {
+      this.db.get(this.getKey(key), (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
+    });
+  }
+  // 是否有值
+  isHaseExist(key) {
+    return new Promise((resolve, reject) => {
+      this.db.Hexists(this.getKey(key), (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
     });
   }
   // 表锁
@@ -89,7 +110,7 @@ class Redis {
   // 是否有锁
   hasLock() {
     return new Promise((resolve, reject) => {
-      db.get(this.getKey('lock'), (err, res) => {
+      this.db.get(this.getKey('lock'), (err, res) => {
         if (err) reject(err);
         resolve(!!res);
       });
@@ -98,7 +119,7 @@ class Redis {
   // key是否存在
   existKey(key) {
     return new Promise((resolve, reject) => {
-      db.exists(this.getKey(key), (err, res) => {
+      this.db.exists(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -107,41 +128,25 @@ class Redis {
   // 删除key
   delKey(key) {
     return new Promise((resolve, reject) => {
-      db.del(this.getKey(key), (err, res) => {
+      this.db.del(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
-    });
-  }
-  DelKey(key, callback) {
-    db.del(key, function (err, res) {
-      // 删除成功，返回1，否则返回0(对于不存在的键进行删除操作，同样返回0)
-      if (callback) {
-        callback(err, key, res);
-      }
     });
   }
   // key过期
   setKeyTimeout(key, timeout) {
     return new Promise((resolve, reject) => {
-      db.expire(this.getKey(key), timeout, (err, res) => {
+      this.db.expire(this.getKey(key), timeout, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
     });
   }
-  SetValue_Timeout(key, timeout, callback) {
-    db.expire(key, timeout, function (err, res) {
-      // 成功，返回1，否则返回0
-      if (callback) {
-        callback(err, key, res);
-      }
-    });
-  }
   // 列表记录总数
   listCount(key) {
     return new Promise((resolve, reject) => {
-      db.llen(this.getKey(key), (err, res) => {
+      this.db.llen(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -150,7 +155,7 @@ class Redis {
   // 列表添加记录
   listPush(key, values) {
     return new Promise((resolve, reject) => {
-      db.rpush(this.getKey(key), values, (err, res) => {
+      this.db.rpush(this.getKey(key), values, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -159,7 +164,7 @@ class Redis {
   // 列表截取记录
   listSlice(key, indexstart, indexend) {
     return new Promise((resolve, reject) => {
-      db.lrange(this.getKey(key), indexstart, indexend, (err, res) => {
+      this.db.lrange(this.getKey(key), indexstart, indexend, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -168,30 +173,30 @@ class Redis {
   // 列表清除记录
   listClear(key) {
     return new Promise((resolve, reject) => {
-      db.ltrim(this.getKey(key), -1, 0, (err, res) => {
+      this.db.ltrim(this.getKey(key), -1, 0, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
     });
   }
-  static connect(opts = {}, onConnect, onError) {
+  static connect(opts = {}, name = 'master', callback) {
     if(!opts.db) opts.db = opts.dbnum;
-    Redis.db = db = redis.createClient(opts.port, opts.host);
-    db.select(opts.db, function () {
+    dbs[name] = redis.createClient(opts.port, opts.host);
+    dbs[name].select(opts.db, function () {
       console.log('Redis select', opts.db, 'db');
     });
-    db.on('connect', () => {
+    dbs[name].on('connect', () => {
       console.log('Redis connected Successfull');
-      redlock = new RedLock(db);
-      if(onConnect) onConnect(db);
+      redlock = new RedLock(dbs[name]);
+      if(callback) callback(dbs[name]);
     });
-    db.on('error', (error) => {
+    dbs[name].on('error', (error) => {
       console.log('Redis proxy error:' + error);
-      if(onError) onError(error, db);
+      if(callback) callback(error, dbs[name]);
     });
   }
-  static close() {
-    db.quit();
+  static close(name) {
+    if(name) dbs[name].quit();
   }
 }
 
