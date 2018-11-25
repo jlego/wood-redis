@@ -3,16 +3,17 @@
 const redis = require("redis");
 const RedLock = require('redlock-node');
 const { Util } = require('wood-util')();
+const { catchErr, error, config } = WOOD;
 let dbs = {}, redlock = null;
 
 class Redis {
   constructor(tbname, db = 'master') {
     this.tbname = tbname;
     this.db = dbs[db];
-    if(!this.db) throw Util.error('redis failed: db=null');
+    if(!this.db) throw error('redis failed: db=null');
   }
   getKey(key){
-    let str = `${WOOD.config.projectName}:${this.tbname}`;
+    let str = `${config.projectName}:${this.tbname}`;
     return key ? `${str}:${key}` : str;
   }
   // 新行id
@@ -73,7 +74,7 @@ class Redis {
   lock(timeout = 1) {
     let that = this;
     return new Promise(async (resolve, reject) => {
-      let hasLock = await Util.catchErr(that.hasLock());
+      let hasLock = await catchErr(that.hasLock());
       if(hasLock.err){
         reject(hasLock.err);
       }else{
@@ -81,7 +82,7 @@ class Redis {
           redlock.lock(this.getKey('lock'), timeout, (err, lockInstance) => {
             if (lockInstance === null) {
               setTimeout(async () => {
-                let result = await Util.catchErr(that.lock(timeout));
+                let result = await catchErr(that.lock(timeout));
                 if(result.err){
                   reject(result.err);
                 }else{
