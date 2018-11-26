@@ -3,17 +3,17 @@
 const redis = require("redis");
 const RedLock = require('redlock-node');
 const { Util } = require('wood-util')();
-const { catchErr, error, config } = WOOD;
 let dbs = {}, redlock = null;
 
 class Redis {
-  constructor(tbname, db = 'master') {
+  constructor(tbname, db = 'master', ctx) {
     this.tbname = tbname;
     this.db = dbs[db];
-    if(!this.db) throw error('redis failed: db=null');
+    this.ctx = ctx;
+    if(!this.db) throw this.ctx.error('redis failed: db=null');
   }
   getKey(key){
-    let str = `${config.projectName}:${this.tbname}`;
+    let str = `${this.ctx.config.projectName}:${this.tbname}`;
     return key ? `${str}:${key}` : str;
   }
   // 新行id
@@ -74,7 +74,7 @@ class Redis {
   lock(timeout = 1) {
     let that = this;
     return new Promise(async (resolve, reject) => {
-      let hasLock = await catchErr(that.hasLock());
+      let hasLock = await this.ctx.catchErr(that.hasLock());
       if(hasLock.err){
         reject(hasLock.err);
       }else{
@@ -82,7 +82,7 @@ class Redis {
           redlock.lock(this.getKey('lock'), timeout, (err, lockInstance) => {
             if (lockInstance === null) {
               setTimeout(async () => {
-                let result = await catchErr(that.lock(timeout));
+                let result = await this.ctx.catchErr(that.lock(timeout));
                 if(result.err){
                   reject(result.err);
                 }else{
@@ -139,6 +139,14 @@ class Redis {
   setKeyTimeout(key, timeout) {
     return new Promise((resolve, reject) => {
       this.db.expire(this.getKey(key), timeout, (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
+    });
+  }
+  brpop(key, times = 0) {
+    return new Promise((resolve, reject) => {
+      this.db.brpop(this.getKey(key), times, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
