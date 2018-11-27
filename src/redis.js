@@ -1,6 +1,6 @@
 // redis操作方法类
-// by YuRonghui 2018-11-22
-const redis = require("redis");
+// by YuRonghui 2018-11-27
+const redis = require("ioredis");
 const RedLock = require('redlock-node');
 const { Util } = require('wood-util')();
 let dbs = {}, redlock = null;
@@ -189,11 +189,14 @@ class Redis {
     });
   }
   static connect(opts = {}, name = 'master', callback) {
-    if(!opts.db) opts.db = opts.dbnum;
-    dbs[name] = redis.createClient(opts.port, opts.host);
-    dbs[name].select(opts.db, function () {
-      console.log('Redis select', opts.db, 'db');
-    });
+    if(Array.isArray(opts)){
+      dbs[name] = new redis.Cluster(opts, {
+        scaleReads: 'slave'
+      });
+    }else{
+      // 'redis://:authpassword@127.0.0.1:6380/4'
+      dbs[name] = new redis(opts);
+    }
     dbs[name].on('connect', () => {
       console.log('Redis connected Successfull');
       redlock = new RedLock(dbs[name]);
