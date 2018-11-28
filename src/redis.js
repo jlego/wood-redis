@@ -36,7 +36,7 @@ class Redis {
   // 取单值
   getValue(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].Hget(this.getKey(key), (err, res) => {
+      dbs[this.db].get(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -54,7 +54,7 @@ class Redis {
   // 取值
   getHaseValue(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].get(this.getKey(key), (err, res) => {
+      dbs[this.db].Hget(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
