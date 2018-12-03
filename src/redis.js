@@ -172,8 +172,6 @@ class Redis {
   // 列表截取记录
   listSlice(key, indexstart, indexend) {
     return new Promise((resolve, reject) => {
-      console.warn(this.getKey(key));
-      
       dbs[this.db].lrange(this.getKey(key), indexstart, indexend, (err, res) => {
         if (err) reject(err);
         resolve(res);
