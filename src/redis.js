@@ -12,7 +12,7 @@ class Redis {
     this.ctx = ctx;
   }
   getKey(key){
-    let str = `${this.ctx.config.projectName}:${this.tbname}`;
+    let str = this.ctx ? `${this.ctx.config.projectName}:${this.tbname}` : this.tbname;
     return key ? `${str}:${key}` : str;
   }
   // 新行id
@@ -25,10 +25,13 @@ class Redis {
     });
   }
   // 设单值
-  setValue(key, value) {
+  setValue(key, value, ttl) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].set(this.getKey(key), value, (err, res) => {
+      let _key = this.getKey(key),
+        client = dbs[this.db];
+      client.set(_key, value, (err, res) => {
         if (err) reject(err);
+        if(ttl) client.expire(_key, ttl);
         resolve(res);
       });
     });
@@ -43,18 +46,30 @@ class Redis {
     });
   }
   // 设值
-  setHaseValue(key, value) {
+  setHaseValue(key, field, value, ttl) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].Hset(this.getKey(key), value, (err, res) => {
+      let _key = this.getKey(key),
+        client = dbs[this.db];
+      client.hset(_key, field, value, (err, res) => {
         if (err) reject(err);
+        if(ttl) client.expire(_key, ttl);
         resolve(res);
       });
     });
   }
   // 取值
-  getHaseValue(key) {
+  getHaseValue(key, field) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].Hget(this.getKey(key), (err, res) => {
+      dbs[this.db].hget(this.getKey(key), field, (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
+    });
+  }
+  // 删除值
+  removeHaseValue(key) {
+    return new Promise((resolve, reject) => {
+      dbs[this.db].hdel(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -63,7 +78,7 @@ class Redis {
   // 是否有值
   isHaseExist(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].Hexists(this.getKey(key), (err, res) => {
+      dbs[this.db].hexists(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -208,6 +223,17 @@ class Redis {
   }
   static close(name = 'master') {
     if(name) dbs[name].quit();
+  }
+
+  static getConnect() {
+    if (dbs['master']) return dbs['master'];
+
+    let keys = Object.keys(dbs);
+    if (keys.length > 0) {
+      return dbs[keys[0]];
+    } else {
+      return null;
+    }
   }
 }
 
