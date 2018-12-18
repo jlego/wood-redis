@@ -6,13 +6,12 @@ const { Util } = require('wood-util')();
 let dbs = {}, redlock = null;
 
 class Redis {
-  constructor(tbname, db = 'master', ctx) {
+  constructor(tbname, db = 'master') {
     this.tbname = tbname;
     this.db = db;
-    this.ctx = ctx;
   }
   getKey(key){
-    let str = this.ctx ? `${this.ctx.config.projectName}:${this.tbname}` : this.tbname;
+    let str = this.tbname;
     return key ? `${str}:${key}` : str;
   }
   // 新行id
@@ -88,7 +87,7 @@ class Redis {
   lock(timeout = 1) {
     let that = this;
     return new Promise(async (resolve, reject) => {
-      let hasLock = await this.ctx.catchErr(that.hasLock());
+      let hasLock = await WOOD.catchErr(that.hasLock());
       if(hasLock.err){
         reject(hasLock.err);
       }else{
@@ -96,7 +95,7 @@ class Redis {
           redlock.lock(this.getKey('lock'), timeout, (err, lockInstance) => {
             if (lockInstance === null) {
               setTimeout(async () => {
-                let result = await this.ctx.catchErr(that.lock(timeout));
+                let result = await WOOD.catchErr(that.lock(timeout));
                 if(result.err){
                   reject(result.err);
                 }else{
@@ -225,15 +224,8 @@ class Redis {
     if(name) dbs[name].quit();
   }
 
-  static getConnect() {
-    if (dbs['master']) return dbs['master'];
-
-    let keys = Object.keys(dbs);
-    if (keys.length > 0) {
-      return dbs[keys[0]];
-    } else {
-      return null;
-    }
+  static getConnect(name = 'master') {
+    return dbs[name];
   }
 }
 
