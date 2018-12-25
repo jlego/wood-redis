@@ -28,11 +28,17 @@ class Redis {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
         client = dbs[this.db];
-      client.set(_key, value, (err, res) => {
-        if (err) reject(err);
-        if(ttl) client.expire(_key, ttl);
-        resolve(res);
-      });
+      if(ttl){
+        client.set(_key, value, 'EX', ttl, (err, res) => {
+          if (err) reject(err);
+          resolve(res);
+        });
+      }else{
+        client.set(_key, value, (err, res) => {
+          if (err) reject(err);
+          resolve(res);
+        });
+      }
     });
   }
   // 取单值
@@ -45,7 +51,7 @@ class Redis {
     });
   }
   // 设值
-  setHaseValue(key, field, value, ttl) {
+  setHashValue(key, field, value, ttl) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
         client = dbs[this.db];
@@ -57,7 +63,7 @@ class Redis {
     });
   }
   // 取值
-  getHaseValue(key, field) {
+  getHashValue(key, field) {
     return new Promise((resolve, reject) => {
       dbs[this.db].hget(this.getKey(key), field, (err, res) => {
         if (err) reject(err);
