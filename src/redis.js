@@ -3,22 +3,22 @@
 const redis = require("ioredis");
 const RedLock = require('redlock-node');
 const calculateSlot = require('cluster-key-slot');
-const { Util } = require('wood-util')();
+// const { Util } = require('wood-util')();
 let dbs = {}, redlock = null;
 
 class Redis {
-  constructor(tbname, db = 'master') {
-    this.tbname = tbname;
-    this.db = db;
+  constructor(tableName, dbName = 'master') {
+    this.tableName = tableName;
+    this.dbName = dbName;
   }
+  
   getKey(key) {
-    let str = this.tbname;
-    return key ? `${str}:${key}` : str;
+    return `${this.dbName}:${this.tableName}:${key}`;
   }
   // 新行id
   rowid() {
     return new Promise((resolve, reject) => {
-      dbs[this.db].incr(this.getKey('rowid'), (err, res) => {
+      dbs[this.dbName].incr(this.getKey('rowid'), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -28,7 +28,7 @@ class Redis {
   setValue(key, value, ttl) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
-        client = dbs[this.db];
+        client = dbs[this.dbName];
       if (ttl) {
         client.set(_key, value, 'EX', ttl, (err, res) => {
           if (err) reject(err);
@@ -45,7 +45,7 @@ class Redis {
   // 取单值
   getValue(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].get(this.getKey(key), (err, res) => {
+      dbs[this.dbName].get(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -55,7 +55,7 @@ class Redis {
   setHashValue(key, field, value, ttl) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
-        client = dbs[this.db];
+        client = dbs[this.dbName];
       client.hset(_key, field, value, (err, res) => {
         if (err) reject(err);
         if (ttl) client.expire(_key, ttl);
@@ -66,7 +66,7 @@ class Redis {
   // 取值
   getHashValue(key, field) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].hget(this.getKey(key), field, (err, res) => {
+      dbs[this.dbName].hget(this.getKey(key), field, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -75,7 +75,7 @@ class Redis {
   // 删除值
   removeHashValue(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].hdel(this.getKey(key), (err, res) => {
+      dbs[this.dbName].hdel(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -84,7 +84,7 @@ class Redis {
   // 是否有值
   isHashExist(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].hexists(this.getKey(key), (err, res) => {
+      dbs[this.dbName].hexists(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -95,7 +95,7 @@ class Redis {
   setMultiHashValue(key, obj, ttl) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
-        client = dbs[this.db];
+        client = dbs[this.dbName];
       client.hmset(_key, obj, (err, res) => {
         if (err) reject(err);
         if (ttl) client.expire(_key, ttl);
@@ -108,7 +108,7 @@ class Redis {
   getMultiHashValue(key, fields) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
-        client = dbs[this.db];
+        client = dbs[this.dbName];
       client.hmget(_key, fields, (err, res) => {
         if (err) reject(err);
         resolve(res);
@@ -119,7 +119,7 @@ class Redis {
   getAllHashValues(key) {
     return new Promise((resolve, reject) => {
       let _key = this.getKey(key),
-        client = dbs[this.db];
+        client = dbs[this.dbName];
       client.hgetall(_key, (err, res) => {
         if (err) reject(err);
         resolve(res);
@@ -168,7 +168,7 @@ class Redis {
   // 是否有锁
   hasLock() {
     return new Promise((resolve, reject) => {
-      dbs[this.db].get(this.getKey('lock'), (err, res) => {
+      dbs[this.dbName].get(this.getKey('lock'), (err, res) => {
         if (err) reject(err);
         resolve(!!res);
       });
@@ -177,7 +177,7 @@ class Redis {
   // key是否存在
   existKey(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].exists(this.getKey(key), (err, res) => {
+      dbs[this.dbName].exists(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -186,7 +186,7 @@ class Redis {
   // 删除key
   delKey(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].del(this.getKey(key), (err, res) => {
+      dbs[this.dbName].del(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -195,7 +195,7 @@ class Redis {
   // key过期
   setKeyTimeout(key, timeout) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].expire(this.getKey(key), timeout, (err, res) => {
+      dbs[this.dbName].expire(this.getKey(key), timeout, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -203,7 +203,7 @@ class Redis {
   }
   brpop(key, times = 0) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].brpop(this.getKey(key), times, (err, res) => {
+      dbs[this.dbName].brpop(this.getKey(key), times, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -212,7 +212,7 @@ class Redis {
   // 列表记录总数
   listCount(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].llen(this.getKey(key), (err, res) => {
+      dbs[this.dbName].llen(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -221,7 +221,7 @@ class Redis {
   // 列表添加记录
   listPush(key, values) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].rpush(this.getKey(key), values, (err, res) => {
+      dbs[this.dbName].rpush(this.getKey(key), values, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -230,7 +230,16 @@ class Redis {
   // 列表截取记录
   listSlice(key, indexstart, indexend) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].lrange(this.getKey(key), indexstart, indexend, (err, res) => {
+      dbs[this.dbName].lrange(this.getKey(key), indexstart, indexend, (err, res) => {
+        if (err) reject(err);
+        resolve(res);
+      });
+    });
+  }
+  // 删除列表某记录
+  listRemove(key, count, value) {
+    return new Promise((resolve, reject) => {
+      dbs[this.dbName].lrem(this.getKey(key), count, value, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -239,7 +248,7 @@ class Redis {
 
   sadd(key, data) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].sadd(this.getKey(key), data, (err, res) => {
+      dbs[this.dbName].sadd(this.getKey(key), data, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -248,7 +257,7 @@ class Redis {
 
   sismember(key, data) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].sismember(this.getKey(key), data, (err, res) => {
+      dbs[this.dbName].sismember(this.getKey(key), data, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -257,7 +266,7 @@ class Redis {
 
   srem(key, data) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].srem(this.getKey(key), data, (err, res) => {
+      dbs[this.dbName].srem(this.getKey(key), data, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -266,7 +275,7 @@ class Redis {
 
   scard(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].scard(this.getKey(key), (err, res) => {
+      dbs[this.dbName].scard(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -275,7 +284,7 @@ class Redis {
 
   smembers(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].smembers(this.getKey(key), (err, res) => {
+      dbs[this.dbName].smembers(this.getKey(key), (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -284,7 +293,7 @@ class Redis {
 
   hmset(key, value) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].hmset(this.getKey(key), value, (err, res) => {
+      dbs[this.dbName].hmset(this.getKey(key), value, (err, res) => {
         if (err) reject(err);
         resolve(res);
       })
@@ -294,7 +303,7 @@ class Redis {
   // 列表清除记录
   listClear(key) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].ltrim(this.getKey(key), 1, 0, (err, res) => {
+      dbs[this.dbName].ltrim(this.getKey(key), 1, 0, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -303,7 +312,7 @@ class Redis {
   // zadd，暂时只支持单条添加
   zadd(score, value) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].zadd(this.getKey(), score, value, (err, res) => {
+      dbs[this.dbName].zadd(this.getKey(), score, value, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -312,17 +321,17 @@ class Redis {
 
   // multi
   multi() {
-    return dbs[this.db].multi();
+    return dbs[this.dbName].multi();
   }
 
   // exec
   exec() {
-    return dbs[this.db].exec();
+    return dbs[this.dbName].exec();
   }
 
   scan(cursor, match, count) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].scan(cursor, 'Match', match, 'Count', count, (err, res) => {
+      dbs[this.dbName].scan(cursor, 'Match', match, 'Count', count, (err, res) => {
         if (err) reject(err);
         resolve(res);
       });
@@ -330,7 +339,7 @@ class Redis {
   }
 
   pipeline() {
-    return dbs[this.db].pipeline();
+    return dbs[this.dbName].pipeline();
   }
 
   calcKeysSlot(keys) {
@@ -346,7 +355,7 @@ class Redis {
 
   zrem(value) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].zrem(this.getKey(), value, (err, res) => {
+      dbs[this.dbName].zrem(this.getKey(), value, (err, res) => {
         if (err) reject(err);
         resolve(res);
       })
@@ -355,7 +364,7 @@ class Redis {
 
   zrange(start, stop) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].zrange(this.getKey(), start, stop, (err, res) => {
+      dbs[this.dbName].zrange(this.getKey(), start, stop, (err, res) => {
         if (err) reject(err);
         resolve(res);
       })
@@ -364,38 +373,38 @@ class Redis {
 
   zrangeByScore(min, max) {
     return new Promise((resolve, reject) => {
-      dbs[this.db].zrangebyscore(this.getKey(), min, max, (err, res) => {
+      dbs[this.dbName].zrangebyscore(this.getKey(), min, max, (err, res) => {
         if (err) reject(err);
         resolve(res);
       })
     })
   }
 
-  static connect(opts = {}, name = 'master', callback) {
+  static connect(opts = {}, dbName = 'master', callback) {
     if (Array.isArray(opts)) {
-      dbs[name] = new redis.Cluster(opts, {
+      dbs[dbName] = new redis.Cluster(opts, {
         scaleReads: 'slave'
       });
     } else {
       // 'redis://:authpassword@127.0.0.1:6380/4'
-      dbs[name] = new redis(opts);
+      dbs[dbName] = new redis(opts);
     }
-    dbs[name].on('connect', () => {
-      console.log(`Redis [${name}] connected Successfull`);
-      redlock = new RedLock(dbs[name]);
-      if (callback) callback(dbs[name]);
+    dbs[dbName].on('connect', () => {
+      console.log(`Redis [${dbName}] connected Successfull`);
+      redlock = new RedLock(dbs[dbName]);
+      if (callback) callback(dbs[dbName]);
     });
-    dbs[name].on('error', (error) => {
-      console.log(`Redis [${name}] proxy error: ${error}`);
-      if (callback) callback(error, dbs[name]);
+    dbs[dbName].on('error', (error) => {
+      console.log(`Redis [${dbName}] proxy error: ${error}`);
+      if (callback) callback(error, dbs[dbName]);
     });
   }
-  static close(name = 'master') {
-    if (name) dbs[name].quit();
+  static close(dbName = 'master') {
+    if (dbName) dbs[dbName].quit();
   }
 
-  static getConnect(name = 'master') {
-    return dbs[name];
+  static getConnect(dbName = 'master') {
+    return dbs[dbName];
   }
 }
 
